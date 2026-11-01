@@ -36,6 +36,7 @@ def is_valid_mac_address(mac_address):
     """
     try:
         # Ensure the MAC address is in a valid format
+        # This line validates a constant string I built on the spot, not the address the operator passed in, so it can never fail and never tells me anything. Every real check on the input happens in the split and hex tests below.
         socket.inet_aton(':'.join(['0'] * 6))  # Dummy check for valid structure.  Doesn't validate the real address.
         if len(mac_address.split(':')) != 6:  # Requires six octets.
             return False
@@ -65,12 +66,14 @@ def lookup_mac_vendor(mac_address):
         url = MAC_VENDOR_API_URL.format(mac_address=mac_address)
         logging.debug(f"Sending request to {url}")  # Debug log
 
+        # I set no timeout on this request, so a slow or silent API host hangs the lookup forever instead of falling into the RequestException handler below.
         response = requests.get(url)
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
 
         data = response.json()
 
         if data and 'result' in data and 'company' in data['result']:
+            # The API answer carries more than the company name, but I keep only this one field. A prefix that is registered yet unassigned and a prefix that was never registered both come back to main as the same plain not found message.
             return data['result']['company']
         else:
             logging.warning(f"Vendor information not found for MAC address: {mac_address}")
@@ -110,6 +113,7 @@ def main():
     if vendor_info:
         print(f"Vendor: {vendor_info}")
     else:
+        # A failed lookup and a completed lookup with no answer land here together, and both exit 0. A script driving me cannot tell a dead API from an unknown vendor without reading the log lines above.
         print("Vendor information not found.")
 
 
